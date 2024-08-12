@@ -1,0 +1,71 @@
+version: '3.8'
+
+services:
+  auth_service:
+    build:
+      context: ./auth_service
+    container_name: auth_service
+    command: python manage.py runserver 0.0.0.0:8001
+    volumes:
+      - ./auth_service:/app
+    ports:
+      - "8001:8001"
+    environment:
+      - DEBUG=True
+    networks:
+      - microservices-network
+
+  notification_service:
+    build:
+      context: ./notification_service
+    container_name: notification_service
+    command: python manage.py runserver 0.0.0.0:8002
+    volumes:
+      - ./notification_service:/app
+    ports:
+      - "8002:8002"
+    environment:
+      - DEBUG=True
+      - AUTH_SERVICE_HOST=auth_service:8001  # Connect to Auth Service via Docker network
+      - CELERY_BROKER_URL=redis://redis:6380/0
+      - CELERY_RESULT_BACKEND=redis://redis:6380/0
+    depends_on:
+      - redis
+      - auth_service
+    networks:
+      - microservices-network
+
+  celery_worker:
+    build:
+      context: ./notification_service
+      dockerfile: Dockerfile.celery
+    container_name: celery_worker
+    command: celery -A notification_service worker --loglevel=info
+    volumes:
+      - ./notification_service:/app
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6380/0
+      - CELERY_RESULT_BACKEND=redis://redis:6380/0
+    depends_on:
+      - redis
+      - notification_service
+    networks:
+      - microservices-network
+
+  redis:
+    image: redis:6.0-alpine
+    container_name: redis
+    command: --port 6380
+    ports:
+      - "6380:6380"
+    expose:
+      - "6380"
+    networks:
+      - microservices-network
+
+networks:
+  microservices-network:
+    driver: bridge
+
+volumes:
+  postgres_data:

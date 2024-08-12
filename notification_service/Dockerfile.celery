@@ -1,0 +1,17 @@
+# Dockerfile for celery_worker
+
+# Use the official Python image from the Docker Hub
+FROM python:3.9-slim
+
+# Set the working directory
+WORKDIR /app
+
+# Install dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy the project files into the container
+COPY . .
+
+# Command to run the Celery worker
+CMD ["celery", "-A", "notifyapp.celery_app", "worker", "--loglevel=info"]
